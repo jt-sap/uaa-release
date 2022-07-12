@@ -1,0 +1,4 @@
+- type: replace # populate "RateLimiterConfig.yml"
+  path: /instance_groups/name=rluaa/jobs/name=uaa/properties/uaa/rate_limiter?/config
+  value:
+    dynamicConfigUrl: https://raw.githubusercontent.com/litesoft/RateLimiterExampleConfig/main/RateLimiters.yaml

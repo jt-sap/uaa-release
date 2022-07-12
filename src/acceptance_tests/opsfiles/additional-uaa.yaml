@@ -1,0 +1,174 @@
+- type: replace
+  path: /releases/-
+  value:
+    name: "rluaa"
+    version: "75.21.0+dev.19"
+
+- type: replace
+  path: /instance_groups/-
+  value:
+    name: rluaa
+    azs:
+    - AZ1
+    instances: 1
+    vm_type: micro
+    stemcell: default
+    networks:
+    - name: infrastructure
+    jobs:
+    - name: uaa
+      release: rluaa
+      properties:
+        encryption:
+          active_key_label: default_key
+          encryption_keys:
+          - label: default_key
+            passphrase: ((uaa_default_encryption_passphrase))
+        login:
+          saml:
+            activeKeyId: key-1
+            keys:
+              key-1:
+                key: "((uaa_login_saml.private_key))"
+                certificate: "((uaa_login_saml.certificate))"
+                passphrase: ""
+        uaa:
+          sslCertificate: "((uaa_ssl.certificate))"
+          sslPrivateKey: "((uaa_ssl.private_key))"
+          zones:
+            internal:
+              hostnames:
+              - rluaa.service.cf.internal
+          url: https://rluaa.((system_domain))
+          admin:
+            client_secret: "((uaa_admin_client_secret))"
+          logging_level: INFO
+          scim:
+            users:
+            - name: admin
+              password: "((cf_admin_password))"
+              groups:
+              - clients.read
+              - cloud_controller.admin
+              - doppler.firehose
+              - network.admin
+              - openid
+              - routing.router_groups.read
+              - routing.router_groups.write
+              - scim.read
+              - scim.write
+          jwt:
+            policy:
+              active_key_id: key-1
+              keys:
+                key-1:
+                  signingKey: "((uaa_jwt_signing_key.private_key))"
+          clients:
+            cc_routing:
+              authorities: routing.router_groups.read
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_cc-routing_secret))"
+            cc-service-dashboards:
+              authorities: clients.read,clients.write,clients.admin
+              authorized-grant-types: client_credentials
+              scope: openid,cloud_controller_service_permissions.read
+              secret: "((uaa_clients_cc-service-dashboards_secret))"
+            cc_service_key_client:
+              authorities: credhub.read,credhub.write
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_cc_service_key_client_secret))"
+            cf:
+              access-token-validity: 1200
+              authorities: uaa.none
+              authorized-grant-types: password,refresh_token
+              override: true
+              refresh-token-validity: 2592000
+              scope: network.admin,network.write,cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read,routing.router_groups.write,cloud_controller.admin_read_only,cloud_controller.global_auditor,perm.admin,clients.read
+              secret: ''
+            cf_smoke_tests:
+              authorities: cloud_controller.admin,clients.read
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_cf_smoke_tests_secret))"
+            cloud_controller_username_lookup:
+              authorities: scim.userids
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_cloud_controller_username_lookup_secret))"
+            credhub_admin_client:
+              authorities: credhub.read,credhub.write
+              authorized-grant-types: client_credentials
+              secret: ((credhub_admin_client_secret))
+            doppler:
+              authorities: uaa.resource
+              override: true
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_doppler_secret))"
+            gorouter:
+              authorities: routing.routes.read
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_gorouter_secret))"
+            ssh-proxy:
+              authorized-grant-types: authorization_code
+              autoapprove: true
+              override: true
+              redirect-uri: "https://rluaa.((system_domain))/login"
+              scope: openid,cloud_controller.read,cloud_controller.write,cloud_controller.admin
+              secret: "((uaa_clients_ssh-proxy_secret))"
+            routing_api_client:
+              authorities: routing.routes.write,routing.routes.read,routing.router_groups.read
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_routing_api_client_secret))"
+            network-policy:
+              authorities: uaa.resource,cloud_controller.admin_read_only
+              authorized-grant-types: client_credentials
+              secret: ((uaa_clients_network_policy_secret))
+            tcp_emitter:
+              authorities: routing.routes.write,routing.routes.read
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_tcp_emitter_secret))"
+            tcp_router:
+              authorities: routing.routes.read,routing.router_groups.read
+              authorized-grant-types: client_credentials
+              secret: "((uaa_clients_tcp_router_secret))"
+          ca_certs:
+          - "((mysql_server_certificate.ca))"
+        uaadb:
+          address: sql-db.service.cf.internal
+          databases:
+          - name: uaa
+            tag: uaa
+          db_scheme: mysql
+          port: 3306
+          roles:
+          - name: uaa
+            password: "((uaa_database_password))"
+            tag: admin
+    - name: route_registrar
+      release: routing
+      properties:
+        nats:
+          tls:
+            enabled: true
+            client_cert: "((nats_client_cert.certificate))"
+            client_key: "((nats_client_cert.private_key))"
+        route_registrar:
+          routes:
+          - health_check:
+              name: rluaa-healthcheck
+              script_path: "/var/vcap/jobs/uaa/bin/dns/healthy"
+            name: rluaa
+            tls_port: 8443
+            server_cert_domain_san: "uaa.service.cf.internal"
+            registration_interval: 10s
+            tags:
+              component: rluaa
+            uris:
+            - rluaa.((system_domain))
+    - name: statsd_injector
+      release: statsd-injector
+      properties: &statsd_injector_properties
+        loggregator:
+          tls:
+            ca_cert: "((loggregator_tls_statsdinjector.ca))"
+            statsd_injector:
+              cert: "((loggregator_tls_statsdinjector.certificate))"
+              key: "((loggregator_tls_statsdinjector.private_key))"

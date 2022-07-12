@@ -1,3 +1,4 @@
 [submodule "src/uaa"]
 	path = src/uaa
-	url = https://github.com/cloudfoundry/uaa.git
+	url = https://github.com/litesoft/uaaRateLimiter.git
+	branch = integratedRateLimiting
